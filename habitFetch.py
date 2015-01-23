@@ -3,6 +3,8 @@ import sqlite3
 import json
 import time
 import settings
+import habitrpg_api
+
 
 db = sqlite3.connect("habitRPG_data.sql") #you can put whatever ... created if not exist
 conn = db.cursor()
@@ -83,9 +85,10 @@ def add_task(name, task_id, task_type, timestamp, value):
         conn.execute("INSERT INTO Tasks (name, task_type, timestamp, value) VALUES (?,?,?,?)",(name, task_type, timestamp, value))
         db.commit()
         conn.execute("SELECT * FROM Tasks WHERE name == ? AND timestamp == ? AND task_type == ?", (name, timestamp, task_type))
-        print "Number of Identical Tasks", len(conn.fetchall())
+        # print "Number of Identical Tasks", len(conn.fetchall())
     else:
-        print "task history already exists"
+        # /\print "task history already exists"
+        pass
 
 
 # def GetAllActivitiesOnDate(month,day,year):
@@ -93,6 +96,24 @@ def add_task(name, task_id, task_type, timestamp, value):
 #     end_time = time.mktime((year,month,day,23,59,0,0,0,0)) #use 1 for last  argument if you live somewhere with dst
 #     conn.execute("SELECT * FROM Activities WHERE timestamp > ? AND timestamp < ?",(start_time,end_time))
 #     return conn.fetchall()
+
+for item in hrpg_access.user()['tags']:
+    print item
+
+print ""
+
+
+for task in hrpg_access.tasks():
+    print task['text']
+    print task['type']
+    print task['tags']
+    print "---------"
+    for item in task:
+        print item
+        if item == "checklist":
+            print task[item]
+    print ""
+
 
 
 def convert_date(old_timestamp):
@@ -105,7 +126,9 @@ def convert_date(old_timestamp):
 
 for habit in hrpg_access.user()['habits']:
     for date in habit['history']:
+        print date
         add_task(str(habit['text']), str(habit['id']), "habit", convert_date(date['date']), date['value'])
+    print ""
 
 for daily in hrpg_access.user()['dailys']:
     for date in daily['history']:

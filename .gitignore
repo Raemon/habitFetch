@@ -1,0 +1,4 @@
+*.pyc
+settings.py
+.DS_Store
+habitRPG_data.sql
