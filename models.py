@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Sequence, create_engine
+from sqlalchemy import Column, Table, Boolean, Integer, String, Float, ForeignKey, Sequence, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship, backref
 
@@ -6,28 +6,30 @@ engine = create_engine('sqlite:///:test.db:')
 
 Base = declarative_base()
 
-class User(Base):
-	__tablename__ = 'users'
-
-	id = Column(Integer, Sequence('user_id_seq'), primary_key=True)
-	name = Column(String)
-	fullname = Column(String)
-	password = Column(String)
-
-	def __repr__(self):
-		return "<User(name='%s', fullname='%s', password='%s')>" % (self.name, self.fullname, self.password)
+tags_tasks_association_table = Table('tags_tasks_association', Base.metadata,
+    Column('tag_id', String, ForeignKey('tasks.id')),
+    Column('task_id', String, ForeignKey('tags.id'))
+)
 
 class Task(Base):
 	__tablename__ = 'tasks'
 	id = Column(String, primary_key=True)
 	name = Column(String)
+	#task_type should be either habit, daily or todo
 	task_type = Column(String)
 	date_created = Column(Float)
-	tags = relationship("Tag", backref=backref('tasks', order_by=date_created))
-	histories = relationship("History", backref='tasks')
+
+	#Many to many
+	tags = relationship('Tag', 
+						secondary=tags_tasks_association_table,
+						backref='tasks')
+
+	#One to many
+	histories = relationship("History", backref='task')
+	checklist_items = relationship('ChecklistItem', backref='task')
 
 	def __repr__(self):
-		return "<Task(id='%s', name='%s', tags='%s', histories='%s')>" % (self.id, self.name, self.tags, self.histories)
+		return "<Task(id='%s', name='%s', date_created='%s')>" % (self.id, self.name, self.date_created)
 
 
 class Tag(Base):
@@ -35,10 +37,9 @@ class Tag(Base):
 
 	id = Column(String, primary_key=True)
 	name = Column(String)
-	tasks = relationship("Task", backref=backref('tags', order_by=id))
 
 	def __repr__(self):
-		return "<Task(id='%s', name='%s', tasks='%s')>" % (self.id, self.name, self.tasks)
+		return "<Task(id='%s', name='%s'>" % (self.id, self.name)
 
 
 class History(Base):
@@ -46,9 +47,20 @@ class History(Base):
 
 	id = Column(Integer, primary_key=True)
 	date_created = Column(Float)
-	task_id = Column(String, ForeignKey('task.id'))
-	task = relationship("Task", backref=backref('histories', order_by=date_created))
+	task_id = Column(String, ForeignKey('tasks.id'))
 
 	value = Column(String)
+
+	def __repr__(self):
+		return "<History(id='%s', date_created='%s', tasks='%s')>" % (self.id, self.name, self.tasks)
+
+class ChecklistItem(Base):
+	__tablename__ = 'checklist_items'
+
+	id = Column(String, primary_key=True)
+	name = Column(String)
+	complete = Column(Boolean)
+
+	task_id = Column(String, ForeignKey('tasks.id'))
 
 Base.metadata.create_all(engine) 

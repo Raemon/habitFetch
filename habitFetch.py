@@ -97,22 +97,23 @@ def add_task(name, task_id, task_type, timestamp, value):
 #     conn.execute("SELECT * FROM Activities WHERE timestamp > ? AND timestamp < ?",(start_time,end_time))
 #     return conn.fetchall()
 
-for item in hrpg_access.user()['tags']:
-    print item
+
+
+for item in hrpg_access.user()['todos']:
+    print item['checklist']
 
 print ""
 
-
-for task in hrpg_access.tasks():
-    print task['text']
-    print task['type']
-    print task['tags']
-    print "---------"
-    for item in task:
-        print item
-        if item == "checklist":
-            print task[item]
-    print ""
+# for task in hrpg_access.tasks():
+#     print task['text']
+#     print task['type']
+#     print task['tags']
+#     print "---------"
+#     for item in task:
+#         print item
+#         if item == "checklist":
+#             print task["checklist"]
+#     print ""
 
 
 
