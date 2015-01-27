@@ -1,3 +1,5 @@
+import requests
+
 class HabitApi(object):
     DIRECTION_UP = "up"
     DIRECTION_DOWN = "down"
