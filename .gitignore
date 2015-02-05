@@ -4,3 +4,4 @@ settings.py
 habitRPG_data.sql
 habitfetch.sublime-workspace
 habitfetch.sublime-project
+venv

@@ -1,13 +1,39 @@
-# from __future__ import print_function
+'''
+The MIT License (MIT)
+
+Copyright (c) 2015 Raymond Arnold, Nathan Hwang
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+'''
+
+# Uses sqlalchemy version 0.9.8
 
 import sqlite3
 import json
 import time
 import datetime
+import calendar
 import settings
 import sqlalchemy
 import sys
 import traceback
+import argparse
 
 from habitrpg_api import HabitApi
 from sqlalchemy.ext.declarative import declarative_base
@@ -23,19 +49,27 @@ Notes
 If you do multiple habits in a short timespan, 
     it saves the old timestamp and updates it with new graph data
 
-
-
 '''
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-v", "--verbose", action="store_true")
+
+VERBOSE = parser.parse_args().verbose
+print VERBOSE
+
+def verbose_print(string):
+    if VERBOSE:
+        print string
 
 def convert_date(old_timestamp):
     try:
         new_timestamp = float(old_timestamp)/1000
     except:
         new_timestamp = time.strptime(old_timestamp.split(".")[0], "%Y-%m-%dT%H:%M:%S")
-        new_timestamp = time.mktime(new_timestamp)
-    return new_timestamp
+        new_timestamp = calendar.timegm(new_timestamp)
 
-print "date", convert_date("2014-06-11T02:24:54.590Z")
+    return new_timestamp
 
 def process_task(session, task):
     try:
@@ -43,7 +77,7 @@ def process_task(session, task):
         tags = [session.query(Tag).filter_by(id=x).first() for x in task['tags'].keys()]
 
 
-        # print json.dumps(task, sort_keys=True,indent=4)
+        verbose_print(json.dumps(task, sort_keys=True,indent=4))
         # Todo tasks have a "date_completed" attribute, others do not
         try:
             date_completed = convert_date(task['dateCompleted'])
@@ -71,7 +105,6 @@ def process_task(session, task):
         except:
             pass
 
-        print "    histories:", histories
 
         for history in histories:
             new_history = add_history(
@@ -91,7 +124,7 @@ def process_task(session, task):
                         )
             except:
                 pass
-            print ""
+            verbose_print("")
     except:
         traceback.print_exc(file=sys.stderr)
         print >> sys.stderr, " "
@@ -103,30 +136,35 @@ def store_latest():
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    print "tag count:", session.query(Tag).count()
-    print "task count:", session.query(Task).count() 
-    print "history count:", session.query(History).count() 
-    print "checklist_item count:", session.query(ChecklistItem).count() 
 
-    print "----                 Checking Tags                     ----"
-    for tag in hrpg.user()['tags']:
-        print find_or_add_tag(session, id=tag['id'], name=tag['name'])
 
-    print "----                 Checking Tasks                    ----"
-    for task in hrpg.tasks():
-        process_task(session, task)
+    if VERBOSE:
+        print "BEFORE:"
+        print "tag count:", session.query(Tag).count()
+        print "task count:", session.query(Task).count() 
+        print "history count:", session.query(History).count() 
+        print "checklist_item count:", session.query(ChecklistItem).count() 
 
-    print "---------------------TAGS IN DATABASE---------------------"
-    for item in session.query(Tag).all():
-        print item
-    print "---------------------TASKS IN DATABASE--------------------"   
-    for task in session.query(Task).all():
-        print task
-        for history in session.query(History).filter_by(task_id=task.id).all():
-            print "    ", history    
-            for checklist_item in session.query(ChecklistItem).filter_by(history_id=history.id).all():
-                print "        ", checklist_item
+        print "----                 Checking Tags                     ----"
+        for tag in hrpg.user()['tags']:
+            print find_or_add_tag(session, id=tag['id'], name=tag['name'])
 
+        print "----                 Checking Tasks                    ----"
+        for task in hrpg.tasks():
+            process_task(session, task)
+
+        print "---------------------TAGS IN DATABASE---------------------"
+        for item in session.query(Tag).all():
+            print item
+        print "---------------------TASKS IN DATABASE--------------------"
+        for task in session.query(Task).all():
+            print task
+            for history in session.query(History).filter_by(task_id=task.id).all():
+                print "    ", history    
+                for checklist_item in session.query(ChecklistItem).filter_by(history_id=history.id).all():
+                    print "        ", checklist_item
+
+    print "AFTER:"
     print "tag count:", session.query(Tag).count()
     print "task count:", session.query(Task).count() 
     print "history count:", session.query(History).count() 
@@ -166,21 +204,21 @@ def add_task(session, id, name, task_type, date_created, date_completed, tags):
         else:
             output = "Task already exists: "
 
+        # Removes all the tags and then re-adds them, to make sure they're cleanly up to date
         while task.tags:
             task.tags.pop()
 
-        print "tags:", tags
         for tag in tags:
             if tag != None:
                 try:
                     task.tags.append(find_or_add_tag(session, tag.id, tag.name))
-                    print >> sys.stdout, "Added tag", tag
+                    verbose_print(("Added tag", tag))
                 except:
                     traceback.print_exc(file=sys.stderr)
                     print >> sys.stderr, "Failed to add tag", tag
 
         session.commit()
-        print >> sys.stdout, output, task.name
+        verbose_print((output, task.name))
         return task
     except:
         traceback.print_exc(file=sys.stderr)
@@ -189,9 +227,11 @@ def add_task(session, id, name, task_type, date_created, date_completed, tags):
 def add_history(session, date_created, task_id, value):
     try:
         history = session.query(History).filter_by(date_created=date_created).filter_by(task_id=task_id).filter_by(value=value).first()
-        print "HISTORY??:", history
 
         if history == None:
+
+            # looks for the most recent history, and compare's it's value to the current value to detect if the user
+            # checked off the daily, or +/- checked a habit
 
             previous_history = session.query(History). \
                                             order_by(History.date_created.desc()). \
@@ -202,14 +242,13 @@ def add_history(session, date_created, task_id, value):
                     adjust = 1
                 if previous_history.value > value:
                     adjust = -1
-                print "previous_history: ", adjust
 
             history = History(date_created=date_created, task_id=task_id, adjust=adjust, value=value)
             session.add(history)
-            output = "    New History Created: "
+            output = "    New History Created:"
         else:
-            output = "    History already exists: "
-        print >> sys.stdout, output, history.date_created   
+            output = "    History already exists:"
+        verbose_print((output, history)) 
         session.commit()
         return history
     except:
@@ -231,7 +270,7 @@ def add_checklist_item(session, name, completed, history_id):
         else:
             output = "    ChecklistItem already exists"
         session.commit()
-        print >> sys.stdout, output, checklist_item
+        verbose_print((output, checklist_item))
         return checklist_item
     except:
         print >> sys.stderr, "Error while adding checklist"
