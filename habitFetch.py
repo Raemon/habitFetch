@@ -3,6 +3,7 @@
 import sqlite3
 import json
 import time
+import datetime
 import settings
 import sqlalchemy
 import sys
@@ -38,8 +39,11 @@ print "date", convert_date("2014-06-11T02:24:54.590Z")
 
 def process_task(session, task):
     try:
+        # Warning: Tasks with old, deleted tags will not retain data about those tagstag
         tags = [session.query(Tag).filter_by(id=x).first() for x in task['tags'].keys()]
-        # print "TASK:", task
+
+
+        # print json.dumps(task, sort_keys=True,indent=4)
         # Todo tasks have a "date_completed" attribute, others do not
         try:
             date_completed = convert_date(task['dateCompleted'])
@@ -54,12 +58,21 @@ def process_task(session, task):
             date_completed=date_completed,
             tags=tags)
 
+        # By default, it creates one history item with today's date. 
+        # If the task has at least one history of it's own, instead it creates histories based on those
+        year = time.gmtime(time.time()).tm_year
+        month = time.gmtime(time.time()).tm_mon
+        day = time.gmtime(time.time()).tm_mday
+        date_created = time.mktime(datetime.datetime(year, month, day).timetuple())*1000
+        histories = [{'date': date_created, 'value':0}]
         try:
-            histories = task['history']
+            if len(task['history']) != 0:
+                histories = task['history']
         except:
-            histories = [{'date': int(time.time()*1000), 'value':0}]
+            pass
 
-        print "histories:", histories
+        print "    histories:", histories
+
         for history in histories:
             new_history = add_history(
                 session = session, 
@@ -67,10 +80,8 @@ def process_task(session, task):
                 task_id = task['id'],
                 value = history['value']
                 )
-            print new_history.date_created
 
             try:
-
                 for checklist_item in task['checklist']:
                     add_checklist_item(
                         session=session,
@@ -80,37 +91,22 @@ def process_task(session, task):
                         )
             except:
                 pass
-        print ""
-        '''
-        else:
-            date_created = time.time()
-            history = add_history(
-                session = session,
-                date_created=date_created,
-                task_id = task['id'],
-                value = task['value'],
-                )
-            try:
-                for checklist_item in task['checklist']:
-                    add_checklist_item(
-                        session=session,
-                        id = checklist_item['id'],
-                        name = checklist_item['text'],
-                        date_created = convert_date(history['date']), 
-                        history_id = history.id,
-                        completed = checklist_item['completed'],
-                        )
-            except:
-                pass
-        '''
+            print ""
     except:
         traceback.print_exc(file=sys.stderr)
         print >> sys.stderr, " "
 
 def store_latest():
     hrpg = HabitApi(user_id = settings.user_id, api_key = settings.api_key)
+
+    json.dumps(hrpg.user())
     Session = sessionmaker(bind=engine)
     session = Session()
+
+    print "tag count:", session.query(Tag).count()
+    print "task count:", session.query(Task).count() 
+    print "history count:", session.query(History).count() 
+    print "checklist_item count:", session.query(ChecklistItem).count() 
 
     print "----                 Checking Tags                     ----"
     for tag in hrpg.user()['tags']:
@@ -124,15 +120,17 @@ def store_latest():
     for item in session.query(Tag).all():
         print item
     print "---------------------TASKS IN DATABASE--------------------"   
-    # for task in session.query(Task).all():
-    #     print task
-    #     for history in session.query(History).filter_by(task_id=task.id).all():
-    #         print "    ", history    
-    #         for checklist_item in session.query(ChecklistItem).filter_by(history_id=history.id).all():
-    #             print "        ", checklist_item
+    for task in session.query(Task).all():
+        print task
+        for history in session.query(History).filter_by(task_id=task.id).all():
+            print "    ", history    
+            for checklist_item in session.query(ChecklistItem).filter_by(history_id=history.id).all():
+                print "        ", checklist_item
 
-    for history in session.query(History).all():
-        print history.date_created
+    print "tag count:", session.query(Tag).count()
+    print "task count:", session.query(Task).count() 
+    print "history count:", session.query(History).count() 
+    print "checklist_item count:", session.query(ChecklistItem).count() 
     session.close()
 
 def find_or_add_tag(session, id, name):
@@ -171,13 +169,15 @@ def add_task(session, id, name, task_type, date_created, date_completed, tags):
         while task.tags:
             task.tags.pop()
 
+        print "tags:", tags
         for tag in tags:
-            try:
-                task.tags.append(find_or_add_tag(session, tag.id, tag.name))
-                print >> sys.stdout, "Added tag", tag
-            except:
-                traceback.print_exc(file=sys.stderr)
-                print >> sys.stderr, "Failed to add tag", tag
+            if tag != None:
+                try:
+                    task.tags.append(find_or_add_tag(session, tag.id, tag.name))
+                    print >> sys.stdout, "Added tag", tag
+                except:
+                    traceback.print_exc(file=sys.stderr)
+                    print >> sys.stderr, "Failed to add tag", tag
 
         session.commit()
         print >> sys.stdout, output, task.name
@@ -188,24 +188,28 @@ def add_task(session, id, name, task_type, date_created, date_completed, tags):
 
 def add_history(session, date_created, task_id, value):
     try:
-        history = session.query(History). \
-                                        filter_by(date_created=convert_date(date_created)). \
-                                        filter_by(task_id=task_id). \
-                                        filter_by(value=value).first()
-
-        # previous_history = session.query(History). \
-        #                                 order_by(date_created=convert_date(date_created)). \
-        #                                 filter_by(task_id=task_id). \
-        #                                 filter_by(value=value)
-        # print "previous_history", previous_history
+        history = session.query(History).filter_by(date_created=date_created).filter_by(task_id=task_id).filter_by(value=value).first()
+        print "HISTORY??:", history
 
         if history == None:
-            converted_date = convert_date(date_created)
-            history = History(date_created=converted_date, task_id=task_id, value=value)
+
+            previous_history = session.query(History). \
+                                            order_by(History.date_created.desc()). \
+                                            filter_by(task_id=task_id).first()
+            adjust = 0
+            if previous_history:
+                if previous_history.value < value:
+                    adjust = 1
+                if previous_history.value > value:
+                    adjust = -1
+                print "previous_history: ", adjust
+
+            history = History(date_created=date_created, task_id=task_id, adjust=adjust, value=value)
             session.add(history)
-            output = "New History Created: "
+            output = "    New History Created: "
         else:
-            output = "History already exists: "
+            output = "    History already exists: "
+        print >> sys.stdout, output, history.date_created   
         session.commit()
         return history
     except:
@@ -215,9 +219,7 @@ def add_history(session, date_created, task_id, value):
 
 def add_checklist_item(session, name, completed, history_id):
     try:
-        checklist_item = session.query(ChecklistItem).\
-            filter_by(history_id=history_id).\
-            filter_by(name=name).first()
+        checklist_item = session.query(ChecklistItem).filter_by(history_id=history_id).filter_by(name=name).first()
         if checklist_item == None:
             checklist_item = ChecklistItem(
                 name=name, 
@@ -225,9 +227,9 @@ def add_checklist_item(session, name, completed, history_id):
                 history_id=history_id
                 )
             session.add(checklist_item)
-            output = "New ChecklistItem Created"
+            output = "    New ChecklistItem Created"
         else:
-            output = "ChecklistItem already exists"
+            output = "    ChecklistItem already exists"
         session.commit()
         print >> sys.stdout, output, checklist_item
         return checklist_item

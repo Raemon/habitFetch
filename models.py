@@ -53,17 +53,17 @@ class History(Base):
     task_id = Column(String, ForeignKey('tasks.id'))
     checklist_items = relationship('ChecklistItem', backref='histories')
 
-    # Should be 1, -1 or 0
+    # Should be 1, -1 or 0  
     # If completed, marked 1
-    # If it is a habit that was downvoted, marked 
-    up_or_downvote = Column(Integer)
+    # If it is a habit that was downvoted, marked -1.
+    adjust = Column(Integer)
 
     # Value should range approximately from -20 to 10
     value = Column(Float)
 
 
     def __repr__(self):
-        return "<History(id='%s', date_created='%s', task_id='%s', value='%s')>" % (self.id, self.date_created, self.task_id, self.value)
+        return "<History(id='%s', date_created='%s', task_id='%s', adjust='%s', value='%s')>" % (self.id, self.date_created, self.task_id, self.adjust, self.value)
 
 
 
