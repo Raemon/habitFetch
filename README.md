@@ -1,23 +1,18 @@
 habitFetch
 ============
 
-Python script that fetches your daily and habit history from HabitRPG, and stores it in a database so you can visualize it later.
+Python script that fetches your daily and habit history from HabitRPG, and stores it in a database so you can visualize it later. (By default, data from habitRPG is stored on internally and old data is gradually lost)
 
-To use this script, set up a crontab or other automated tool that can run a python script at least once a day.
+To use this script, set up a crontab or other automated tool that can run a python script at least once a day, running the file
 
 ##Setup##
 
-Edit the settings.py file to include your habitRPG user_id and api_key. (Find these in the API section of the habitRPG website, after logging in)
 
-##Potential Problems##
+1) > cd HabitFetch
 
-	Problems with HabitRPG:
-		- sometimes an item has no history
-		- sometimes an item's id doesn't follow the id format (I once saw an id that was the same as the name)
+2) Edit the settings.py file to include your habitRPG user_id and api_key. (Find these in the API section of the habitRPG website, after logging in)
 
-
-	Problems with HabitFetch
-		- if an item has history, make sure that history is used instead of creating one based off "today"
+3) > python habitFetch.py
 
 ##License##
 
